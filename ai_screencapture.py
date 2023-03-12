@@ -8,11 +8,18 @@ import multiprocessing
 class ScreencaptureAgent:
     def __init__(self) -> None:
         self.img = None
+        self.img_health = None
         self.capture_process = None
         self.fps = None
+        self.img_health_HSV = None
         self.enable_cv_preview = True
 
-        self.w, self.h = pyautogui.size()
+        self.top_left = (473, 485)
+        self.bottom_right = (682, 495)
+
+        #self.w, self.h = pyautogui.size()
+        self.w = 1306
+        self.h = 1076
         print("Screen Res:" + "w:" + str(self.w) + " h:" + str(self.h))
         self.monitor = {"top": 0, "left": 0, "width": self.w, "height": self.h}
 
@@ -27,6 +34,12 @@ class ScreencaptureAgent:
                 #img is now stored in mem
                 # this function captures in BGR not RGB, convenient because CV2 also works in BGR
                 self.img = np.array(self.img)
+                self.img_health = self.img[
+                    self.top_left[1]: self.bottom_right[1],
+                    self.top_left[0]: self.bottom_right[0]
+                ]
+
+                self.img_health_HSV = cv.cvtColor(self.img_health, cv.COLOR_BGR2HSV)
 
                 # reduce it by a scalar of 0.5, ignore second variable input so put in 0,0
                 if(self.enable_cv_preview) :
@@ -46,9 +59,18 @@ class ScreencaptureAgent:
                             1,
                             cv.LINE_AA
                         )
-
+                        cv.putText(
+                            small,
+                            "Health: " + str(hue_match_pct(self.img_health_HSV, 0, 15)),
+                            (25, 100),
+                            cv.FONT_HERSHEY_COMPLEX,
+                            1,
+                            (0, 0, 255),
+                            1,
+                            cv.LINE_AA
+                        )
                     cv.imshow("Computer Vision", small)
-                    key = cv.waitKey(1)
+                    cv.imshow("Health Bar", self.img_health)
 
                 # introduce a delay to see the screen
                 # wait 1 ms
@@ -60,6 +82,7 @@ class ScreencaptureAgent:
                     n_frames = 0
                     fps_report_time = time.time()
                 n_frames += 1
+                cv.waitKey(1)             
 
 class bColors:
     PINK = '\033[95m'
@@ -76,6 +99,21 @@ def print_menu():
     print(f'{bColors.RED}\ts - stop{bColors.ENDC}\tStop screen capture')
     print(f'\tq - quit\tQuit the program')
 
+def convert_hue(hue):
+        ratio = 361 /180
+        return np.round(hue / ratio, 2)
+
+def hue_match_pct(img , hue_low, hue_high):
+    match_pixels = 0
+    no_match_pixels = 0
+    for pixel in img:
+        for h, s, v in pixel:
+            if convert_hue(hue_low) <= h <= convert_hue(hue_high):
+                match_pixels += 1
+            else:
+                no_match_pixels += 1
+    total_pixels = match_pixels + no_match_pixels
+    return np.round(match_pixels / total_pixels, 2) * 100
 #entry point
 if __name__ == "__main__":
     screen_agent = ScreencaptureAgent()
